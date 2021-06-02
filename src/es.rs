@@ -95,7 +95,7 @@ async fn get_outdated_indices(
     Ok(outdated_indices)
 }
 
-/// Take an elasticsearch snapshot, the index name as snapshot name
+/// Take an elasticsearch snapshot, use the index name as snapshot name
 ///
 /// If you send GET request to query the status of the snapshot through the
 /// `_snapshot` api, i.e `GET /_snapshot/elasticsearch-snapshot-log-repo/test`,
@@ -135,7 +135,7 @@ async fn take_snapshot(
           "ignore_unavailable": true,
           "include_global_state": false,
           "metadata": {
-            "taken_by": "elasticsearch-snapshot",
+            "taken_by": "elasticsearch-index-cleaner",
             "taken_because": "scheduled backup"
           }
         }))
@@ -148,6 +148,9 @@ async fn take_snapshot(
     Ok(())
 }
 
+/// Take an elasticsearch snapshot, use the index name as snapshot name
+/// and check the snapshot status. If the snapshot is successfully taken, return
+/// immediately. Otherwise, it will sleep and wait snapshot to be successful.
 pub async fn take_snapshot_and_check(
     client: &Elasticsearch, repository: &str, index: &str,
 ) -> anyhow::Result<()> {
@@ -163,7 +166,7 @@ pub async fn take_snapshot_and_check(
     Ok(())
 }
 
-/// Return snapshot status, true if snapshot is successful taken, otherwise
+/// Check snapshot status, true if snapshot has been successful taken, otherwise
 /// return false
 ///
 /// The response from elasticsearch `_snapshot` api looks like this:
@@ -221,6 +224,9 @@ pub async fn is_snapshot_success(
 }
 
 /// Delete index from elasticsearch
+///
+/// This will only send DELETE request to elasticsearch endpoint, and discards
+/// the response.
 async fn delete_index(
     client: &Elasticsearch, index: &str,
 ) -> anyhow::Result<()> {
