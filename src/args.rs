@@ -24,11 +24,14 @@ pub struct Opt {
     #[structopt(short = "r", long)]
     pub elasticsearch_repo: String,
 
-    /// Elasticsearch indices to filter, comma separated list of index prefix, i.e app-,logstash-
+    /// Elasticsearch indices to filter, comma separated list of index prefix,
+    /// i.e app-,logstash-
     #[structopt(
         short = "f",
         long,
-        default_value = "app-*,istio-system-*,kong-*,kube-system-*,pulsar-*,logstash-*,haproxy-*,nginx-*,eksfan-logstash-*,kong-logstash-*,kongingress-*,app-meican-logstash-*"
+        default_value = "app-*,istio-system-*,kong-*,kube-system-*,pulsar-*,\
+                         logstash-*,haproxy-*,nginx-*,eksfan-logstash-*,\
+                         kong-logstash-*,kongingress-*,app-meican-logstash-*"
     )]
     pub index_filter: String,
 
