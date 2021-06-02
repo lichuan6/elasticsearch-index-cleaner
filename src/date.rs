@@ -14,8 +14,8 @@ where
 {
     let s = String::deserialize(deserializer)?;
     // NOTE:
-    // elasticsearch cat api return creation_date as String not integer, we need to convert to
-    // i64, then to a DateTime
+    // elasticsearch cat api return creation_date as String not integer, we need
+    // to convert to i64, then to a DateTime
     let t = s.parse::<i64>().map_err(serde::de::Error::custom)?;
     Ok(DateTime::<Utc>::from_utc(
         NaiveDateTime::from_timestamp(t / 1000, (t as u32) % 1000),

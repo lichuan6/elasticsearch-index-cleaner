@@ -44,16 +44,15 @@ pub fn create_client(addr: &str) -> anyhow::Result<Elasticsearch, Error> {
     Ok(Elasticsearch::new(transport))
 }
 
-/// Clean elasticsearch indices, take snapshots for outdated indices, and delete the coresponding
-/// indices after snapshots are successfully created.
+/// Clean elasticsearch indices, take snapshots for outdated indices, and delete
+/// the coresponding indices after snapshots are successfully created.
 pub async fn indices_clean(
-    client: &Elasticsearch,
-    repository: &str,
-    keep_days: u32,
+    client: &Elasticsearch, repository: &str, keep_days: u32,
     index_filter: &str,
 ) -> anyhow::Result<()> {
     let index_filter = index_filter.split(",").collect::<Vec<_>>();
-    let outdated_indices = get_outdated_indices(client, keep_days, &index_filter).await?;
+    let outdated_indices =
+        get_outdated_indices(client, keep_days, &index_filter).await?;
     if !outdated_indices.is_empty() {
         log::info!("{} outdated indices found", &outdated_indices.len());
     }
@@ -66,9 +65,7 @@ pub async fn indices_clean(
 
 /// Return a vector of outdated indices
 async fn get_outdated_indices(
-    client: &Elasticsearch,
-    keep_days: u32,
-    index_filter: &[&str],
+    client: &Elasticsearch, keep_days: u32, index_filter: &[&str],
 ) -> anyhow::Result<Vec<String>> {
     let response = client
         .cat()
@@ -81,12 +78,16 @@ async fn get_outdated_indices(
         .await?;
 
     log::debug!("calling cat indices response : {:?}", response);
-    let indices: Vec<IndexAndCreationDate> = response.json::<Vec<IndexAndCreationDate>>().await?;
+    let indices: Vec<IndexAndCreationDate> =
+        response.json::<Vec<IndexAndCreationDate>>().await?;
     log::info!("index_filter: {:?}, indices: {:#?}", index_filter, indices);
     let now = Utc::now();
     let outdated_indices = indices
         .iter()
-        .filter(|i| now.signed_duration_since(i.creation_date).num_days() > keep_days as i64)
+        .filter(|i| {
+            now.signed_duration_since(i.creation_date).num_days()
+                > keep_days as i64
+        })
         .map(|i| i.index.to_string())
         .collect::<Vec<_>>();
 
@@ -96,7 +97,9 @@ async fn get_outdated_indices(
 
 /// Take an elasticsearch snapshot, the index name as snapshot name
 ///
-/// If you send GET request to query the status of the snapshot through the `_snapshot` api, i.e `GET /_snapshot/elasticsearch-snapshot-log-repo/test`, the response will be like:
+/// If you send GET request to query the status of the snapshot through the
+/// `_snapshot` api, i.e `GET /_snapshot/elasticsearch-snapshot-log-repo/test`,
+/// the response will be like:
 ///
 /// ```json
 /// {
@@ -121,9 +124,7 @@ async fn get_outdated_indices(
 /// }
 /// ```
 async fn take_snapshot(
-    client: &Elasticsearch,
-    repository: &str,
-    index: &str,
+    client: &Elasticsearch, repository: &str, index: &str,
 ) -> anyhow::Result<()> {
     log::info!("taking snapshot for {}, repository: {}", index, repository);
     let response = client
@@ -148,9 +149,7 @@ async fn take_snapshot(
 }
 
 pub async fn take_snapshot_and_check(
-    client: &Elasticsearch,
-    repository: &str,
-    index: &str,
+    client: &Elasticsearch, repository: &str, index: &str,
 ) -> anyhow::Result<()> {
     take_snapshot(client, repository, index).await?;
     loop {
@@ -164,7 +163,8 @@ pub async fn take_snapshot_and_check(
     Ok(())
 }
 
-/// Return snapshot status, true if snapshot is successful taken, otherwise return false
+/// Return snapshot status, true if snapshot is successful taken, otherwise
+/// return false
 ///
 /// The response from elasticsearch `_snapshot` api looks like this:
 ///
@@ -193,9 +193,7 @@ pub async fn take_snapshot_and_check(
 /// }
 /// ```
 pub async fn is_snapshot_success(
-    client: &Elasticsearch,
-    repository: &str,
-    snapshot: &str,
+    client: &Elasticsearch, repository: &str, snapshot: &str,
 ) -> anyhow::Result<bool> {
     let response = client
         .snapshot()
@@ -223,7 +221,9 @@ pub async fn is_snapshot_success(
 }
 
 /// Delete index from elasticsearch
-async fn delete_index(client: &Elasticsearch, index: &str) -> anyhow::Result<()> {
+async fn delete_index(
+    client: &Elasticsearch, index: &str,
+) -> anyhow::Result<()> {
     let response = client
         .indices()
         .delete(IndicesDeleteParts::Index(&[index]))
