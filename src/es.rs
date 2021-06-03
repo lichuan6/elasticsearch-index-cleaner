@@ -50,7 +50,7 @@ pub async fn indices_clean(
     client: &Elasticsearch, repository: &str, keep_days: u32,
     index_filter: &str,
 ) -> anyhow::Result<()> {
-    let index_filter = index_filter.split(",").collect::<Vec<_>>();
+    let index_filter = index_filter.split(',').collect::<Vec<_>>();
     let outdated_indices =
         get_outdated_indices(client, keep_days, &index_filter).await?;
     if !outdated_indices.is_empty() {

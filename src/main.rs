@@ -1,22 +1,22 @@
-use elasticsearch_index_cleaner::{args::Opt, es, es::indices_clean};
-use std::env;
+use elasticsearch_index_cleaner::{
+    args::{value_or_env, Opt},
+    es,
+    es::indices_clean,
+};
 use structopt::StructOpt;
-
-pub fn env_or_else(key: &str, or: &str) -> String {
-    env::var(key).ok().unwrap_or_else(|| or.to_string())
-}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
     log::info!("Elasticsearch index cleaner started!");
     let opt = Opt::from_args();
-    let es_addr = env_or_else("ELASTICSEARCH_ADDRESS", &opt.elasticsearch_addr);
+
+    let es_addr = value_or_env("ELASTICSEARCH_ADDR", opt.elasticsearch_addr)?;
     let repository =
-        env_or_else("ELASTICSEARCH_REPOSITORY", &opt.elasticsearch_repo);
-    let keep_days = opt.keep_days;
+        value_or_env("ELASTICSEARCH_REPO", opt.elasticsearch_repo)?;
     let index_filter =
-        env_or_else("ELASTICSEARCH_INDEX_FILTER", &opt.index_filter);
+        value_or_env("ELASTICSEARCH_INDEX_FILTER", opt.index_filter)?;
+    let keep_days = opt.keep_days;
 
     let client = es::create_client(&es_addr).unwrap();
     indices_clean(&client, &repository, keep_days, &index_filter).await?;
