@@ -28,7 +28,7 @@ RUN cargo install --path .
 #FROM scratch
 # FROM alpine:latest
 FROM gcr.io/distroless/cc-debian10
-COPY --from=builder /usr/local/cargo/bin/elasticsearch-index-cleaner /pulsar-elasticsearch-sync-rs
+COPY --from=builder /usr/local/cargo/bin/elasticsearch-index-cleaner /elasticsearch-index-cleaner
 #COPY static .
 # USER 1000
 ENTRYPOINT ["/elasticsearch-index-cleaner"]
