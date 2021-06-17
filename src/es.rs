@@ -154,7 +154,19 @@ async fn take_snapshot(
 pub async fn take_snapshot_and_check(
     client: &Elasticsearch, repository: &str, index: &str,
 ) -> anyhow::Result<()> {
+    loop {
+        let snapshot_running = is_snapshot_running(client).await?;
+        // if any snapshot is running, we'll wait it to be finished.
+        if snapshot_running {
+            // TODO: we should log the running snapshot.
+            tokio::time::sleep(Duration::from_secs(10)).await;
+            continue;
+        }
+        break;
+    }
+
     take_snapshot(client, repository, index).await?;
+
     loop {
         if !is_snapshot_success(client, repository, index).await? {
             log::info!("snapshot {} is not ready, sleep 10s...", index);
@@ -238,4 +250,17 @@ async fn delete_index(
     let body = response.text().await?;
     log::info!("delete index: {}, response: {:?}", index, body);
     Ok(())
+}
+
+/// Check if snapshot is running under specified repository, return true if
+/// snapshot is running, otherwise return false.
+async fn is_snapshot_running(client: &Elasticsearch) -> anyhow::Result<bool> {
+    log::info!("checking all snapshot status ...");
+    let response =
+        client.snapshot().status(SnapshotStatusParts::None).send().await?;
+
+    log::info!("snapshot status for response: {:?}", response);
+    let snapshots = response.json::<Snapshots>().await?;
+
+    Ok(!snapshots.snapshots.is_empty())
 }
