@@ -219,6 +219,7 @@ pub async fn is_snapshot_success(
         .send()
         .await?;
 
+    log::debug!("snapshot status check response: {:?}", response);
     let snapshots = response.json::<Snapshots>().await?;
     log::info!("snapshots status: {:?}", snapshots);
 
