@@ -28,6 +28,13 @@ struct Snapshots {
 }
 
 #[derive(Deserialize, Debug)]
+#[serde(untagged)]
+enum SnapshotStatus {
+    Snapshots(Snapshots),
+    Error(serde_json::Value),
+}
+
+#[derive(Deserialize, Debug)]
 struct Snapshot {
     snapshot: String,
     state: String,
@@ -207,6 +214,25 @@ pub async fn take_snapshot_and_check(
 ///   } ]
 /// }
 /// ```
+///
+/// The snapshot response will also be like this, if the snapshot is moved to s3 glacier, we also treat
+/// it as a successful snapshot:
+/// ```
+/// {
+///   "error" : {
+///     "root_cause" : [
+///       {
+///         "type" : "amazon_s3_exception",
+///         "reason" : "amazon_s3_exception: The operation is not valid for the object's storage class (Service: Amazon S3; Status Code: 403; Error Code: InvalidObjectState; Request ID: K2X4VQB6CG8XPT4G; S3 Extended Request ID: S6yIw6vZ1WEO3dbVwpdnvE41YnGYrMUcQL5QfAXdLlXqybT33lqF+ePfY4+G4oGitnLtL4GVQew=)"
+///       }
+///     ],
+///     "type" : "amazon_s3_exception",
+///     "reason" : "amazon_s3_exception: The operation is not valid for the object's storage class (Service: Amazon S3; Status Code: 403; Error Code: InvalidObjectState; Request ID: K2X4VQB6CG8XPT4G; S3 Extended Request ID: S6yIw6vZ1WEO3dbVwpdnvE41YnGYrMUcQL5QfAXdLlXqybT33lqF+ePfY4+G4oGitnLtL4GVQew=)"
+///   },
+///   "status" : 500
+/// }
+/// ```
+
 pub async fn is_snapshot_success(
     client: &Elasticsearch, repository: &str, snapshot: &str,
 ) -> anyhow::Result<bool> {
@@ -220,19 +246,55 @@ pub async fn is_snapshot_success(
         .await?;
 
     log::debug!("snapshot status check response: {:?}", response);
-    let snapshots = response.json::<Snapshots>().await?;
-    log::info!("snapshots status: {:?}", snapshots);
+    let s3_object_class_error = "amazon_s3_exception: The operation is not valid for the object's storage class";
+    let body = response.text().await?;
+    match serde_json::from_str::<SnapshotStatus>(&body) {
+        Ok(snapshot_status) => {
+            match snapshot_status {
+                SnapshotStatus::Snapshots(snapshots) => {
+                    log::info!("snapshots status: {:?}", snapshots);
+                    let count = snapshots
+                        .snapshots
+                        .iter()
+                        .filter(|s| {
+                            s.snapshot == snapshot && s.state == "SUCCESS"
+                        })
+                        .count();
 
-    let count = snapshots
-        .snapshots
-        .iter()
-        .filter(|s| s.snapshot == snapshot && s.state == "SUCCESS")
-        .count();
-
-    if count > 0 {
-        Ok(true)
-    } else {
-        Ok(false)
+                    if count > 0 {
+                        Ok(true)
+                    } else {
+                        Ok(false)
+                    }
+                }
+                // check if get snapshot status response has error, and also check if the error contains object
+                // storage class error, which means the snapshot maybe moved to s3 glacier.
+                SnapshotStatus::Error(error) => {
+                    log::info!("snapshot status error: {:?}", error);
+                    if let Some(error) = error.get("error") {
+                        if let Some(reason) = error.get("reason") {
+                            if let Some(reason) = reason.as_str() {
+                                if reason.contains(s3_object_class_error) {
+                                    return Ok(true);
+                                } else {
+                                    log::debug!(
+                                        "snapshot error other reason: {}",
+                                        reason
+                                    );
+                                    return Ok(false);
+                                }
+                            }
+                        }
+                    }
+                    Ok(false)
+                }
+            }
+        }
+        Err(e) => {
+            log::debug!("failed to parse snapshot status response: {}", e);
+            log::debug!("response: {}", body);
+            Ok(false)
+        }
     }
 }
 
